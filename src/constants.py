@@ -57,10 +57,10 @@ MODERATION_VALUES_FOR_FLAGGED = {
     "harassment/threatening": 0.1,
     "hate": 0.4,
     "hate/threatening": 0.05,
-    "self-harm": 0.1,
-    "self-harm/instructions": 0.5,
+    "self-harm": 0.4,
+    "self-harm/instructions": 0.7,
     "self-harm/intent": 0.7,
-    "sexual": 0.3,
+    "sexual": 0.9,
     "sexual/minors": 0.1,
     "violence": 0.1,
     "violence/graphic": 0.1,
@@ -69,7 +69,7 @@ MODERATION_VALUES_FOR_FLAGGED = {
 SECONDS_DELAY_RECEIVING_MSG = (
     3  # give a delay for the bot to respond so it can catch multiple messages
 )
-MAX_THREAD_MESSAGES = 200
+MAX_THREAD_MESSAGES = 400
 ACTIVATE_THREAD_PREFX = "💬✅"
 INACTIVATE_THREAD_PREFIX = "💬❌"
 MAX_CHARS_PER_REPLY_MSG = (
