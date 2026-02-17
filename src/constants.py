@@ -21,7 +21,7 @@ EXAMPLE_CONVOS = CONFIG.example_conversations
 
 DISCORD_BOT_TOKEN = os.environ["DISCORD_BOT_TOKEN"]
 DISCORD_CLIENT_ID = os.environ["DISCORD_CLIENT_ID"]
-OPENAI_API_KEY = os.environ["OPENAI_API_KEY"]
+GROQ_API_KEY = os.environ["GROQ_API_KEY"]
 DEFAULT_MODEL = os.environ["DEFAULT_MODEL"]
 
 ALLOWED_SERVER_IDS: List[int] = []
@@ -32,48 +32,27 @@ for s in server_ids:
 SERVER_TO_MODERATION_CHANNEL: Dict[int, int] = {}
 server_channels = os.environ.get("SERVER_TO_MODERATION_CHANNEL", "").split(",")
 for s in server_channels:
-    values = s.split(":")
-    SERVER_TO_MODERATION_CHANNEL[int(values[0])] = int(values[1])
+    if s.strip():  # Skip empty strings
+        values = s.strip().split(":")
+        if len(values) == 2:  # Ensure proper format
+            SERVER_TO_MODERATION_CHANNEL[int(values[0])] = int(values[1])
 
 # Send Messages, Create Public Threads, Send Messages in Threads, Manage Messages, Manage Threads, Read Message History, Use Slash Command
 BOT_INVITE_URL = f"https://discord.com/api/oauth2/authorize?client_id={DISCORD_CLIENT_ID}&permissions=328565073920&scope=bot"
 
-MODERATION_VALUES_FOR_BLOCKED = {
-    "harassment": 0.5,
-    "harassment/threatening": 0.1,
-    "hate": 0.5,
-    "hate/threatening": 0.1,
-    "self-harm": 0.2,
-    "self-harm/instructions": 0.5,
-    "self-harm/intent": 0.7,
-    "sexual": 0.5,
-    "sexual/minors": 0.2,
-    "violence": 0.7,
-    "violence/graphic": 0.8,
-}
-
-MODERATION_VALUES_FOR_FLAGGED = {
-    "harassment": 0.5,
-    "harassment/threatening": 0.1,
-    "hate": 0.4,
-    "hate/threatening": 0.05,
-    "self-harm": 0.4,
-    "self-harm/instructions": 0.7,
-    "self-harm/intent": 0.7,
-    "sexual": 0.9,
-    "sexual/minors": 0.1,
-    "violence": 0.1,
-    "violence/graphic": 0.1,
-}
+SECONDS_DELAY_RECEIVING_MSG = (
+    3  # give a delay for the bot to respond so it can catch multiple messages
+)
 
 SECONDS_DELAY_RECEIVING_MSG = (
     3  # give a delay for the bot to respond so it can catch multiple messages
 )
 MAX_THREAD_MESSAGES = 400
+MAX_HISTORY_MESSAGES = 25  # Limit context window to recent messages for token efficiency
 ACTIVATE_THREAD_PREFX = "💬✅"
 INACTIVATE_THREAD_PREFIX = "💬❌"
 MAX_CHARS_PER_REPLY_MSG = (
     1500  # discord has a 2k limit, we just break message into 1.5k
 )
 
-AVAILABLE_MODELS = Literal["gpt-3.5-turbo", "gpt-4", "gpt-4-1106-preview", "gpt-4-32k"]
+AVAILABLE_MODELS = Literal["llama-3.3-70b-versatile", "llama3-70b-8192", "llama3-8b-8192", "mixtral-8x7b-32639"]

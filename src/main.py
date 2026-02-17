@@ -11,6 +11,7 @@ from src.constants import (
     EXAMPLE_CONVOS,
     ACTIVATE_THREAD_PREFX,
     MAX_THREAD_MESSAGES,
+    MAX_HISTORY_MESSAGES,
     SECONDS_DELAY_RECEIVING_MSG,
     AVAILABLE_MODELS,
     DEFAULT_MODEL,
@@ -185,6 +186,10 @@ async def chat_command(
 
 
 # calls for each message
+# Trigger words for direct mentions
+TRIGGER_WORDS = ["ash", "ashley"]
+
+
 @client.event
 async def on_message(message: DiscordMessage):
     try:
@@ -196,8 +201,65 @@ async def on_message(message: DiscordMessage):
         if message.author == client.user:
             return
 
-        # ignore messages not in a thread
         channel = message.channel
+        
+        # Handle regular channel messages with trigger words
+        if isinstance(channel, discord.TextChannel):
+            should_respond = False
+            
+            # Check for trigger words
+            message_lower = message.content.lower()
+            if any(trigger in message_lower for trigger in TRIGGER_WORDS):
+                should_respond = True
+                logger.info(
+                    f"Direct message from {message.author}: {message.content[:50]}"
+                )
+            
+            # Check if replying to a bot message
+            elif message.reference is not None:
+                try:
+                    replied_to = await channel.fetch_message(message.reference.message_id)
+                    if replied_to.author == client.user:
+                        should_respond = True
+                        logger.info(
+                            f"Reply to bot from {message.author}: {message.content[:50]}"
+                        )
+                except Exception as e:
+                    logger.debug(f"Could not fetch referenced message: {e}")
+            
+            if should_respond:
+                # moderate the message
+                flagged_str, blocked_str = moderate_message(
+                    message=message.content, user=message.author
+                )
+                if len(blocked_str) > 0:
+                    await message.reply(
+                        embed=discord.Embed(
+                            description="❌ Your message was blocked by our filter.",
+                            color=discord.Color.red(),
+                        )
+                    )
+                    return
+                
+                # generate response
+                async with channel.typing():
+                    response_data = await generate_completion_response(
+                        messages=[Message(user=message.author.name, text=message.content)],
+                        user=message.author,
+                        thread_config=ThreadConfig(
+                            model=DEFAULT_MODEL,
+                            max_tokens=512,
+                            temperature=1.0,
+                        ),
+                    )
+                
+                # send response
+                await process_response(
+                    user=message.author, thread=channel, response_data=response_data
+                )
+            return
+
+        # Handle thread messages (existing logic)
         if not isinstance(channel, discord.Thread):
             return
 
@@ -280,7 +342,7 @@ async def on_message(message: DiscordMessage):
 
         channel_messages = [
             discord_message_to_message(message)
-            async for message in thread.history(limit=MAX_THREAD_MESSAGES)
+            async for message in thread.history(limit=MAX_HISTORY_MESSAGES)
         ]
         channel_messages = [x for x in channel_messages if x is not None]
         channel_messages.reverse()

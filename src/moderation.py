@@ -1,38 +1,48 @@
-from openai._compat import model_dump
-
 from src.constants import (
     SERVER_TO_MODERATION_CHANNEL,
-    MODERATION_VALUES_FOR_BLOCKED,
-    MODERATION_VALUES_FOR_FLAGGED,
 )
-from openai import OpenAI
-
-client = OpenAI()
 from typing import Optional, Tuple
 import discord
 from src.utils import logger
+
+# Simple local content filter (no API costs)
+BLOCKED_KEYWORDS = {
+    # Extremely severe content only
+    "bomb", "kill yourself", "terrorism", "rape", "child porn", "bestiality", "gore", "illegal weapons", "transphobia", "incest", "suicide", "extremist content", "terrorist recruitment"
+}
+
+FLAGGED_KEYWORDS = {
+    # Potentially concerning but not blocked
+    "hate", "abuse", "spam",
+}
 
 
 def moderate_message(
     message: str, user: str
 ) -> Tuple[str, str]:  # [flagged_str, blocked_str]
-    moderation_response = client.moderations.create(
-        input=message, model="text-moderation-latest"
-    )
-    category_scores = moderation_response.results[0].category_scores or {}
-
-    category_score_items = model_dump(category_scores)
-
+    """
+    Local moderation using keyword filtering.
+    Returns (flagged_str, blocked_str) - both empty if content is OK.
+    """
+    message_lower = message.lower()
     blocked_str = ""
     flagged_str = ""
-    for category, score in category_score_items.items():
-        if score > MODERATION_VALUES_FOR_BLOCKED.get(category, 1.0):
-            blocked_str += f"({category}: {score})"
-            logger.info(f"blocked {user} {category} {score}")
+    
+    # Check blocked keywords
+    for keyword in BLOCKED_KEYWORDS:
+        if keyword in message_lower:
+            blocked_str = f"(blocked_keyword: {keyword})"
+            logger.info(f"blocked {user} - keyword: {keyword}")
             break
-        if score > MODERATION_VALUES_FOR_FLAGGED.get(category, 1.0):
-            flagged_str += f"({category}: {score})"
-            logger.info(f"flagged {user} {category} {score}")
+    
+    # Check flagged keywords (only if not already blocked)
+    if not blocked_str:
+        for keyword in FLAGGED_KEYWORDS:
+            if keyword in message_lower:
+                flagged_str = f"(flagged_keyword: {keyword})"
+                logger.info(f"flagged {user} - keyword: {keyword}")
+                # Don't break - could have multiple flags
+    
     return (flagged_str, blocked_str)
 
 

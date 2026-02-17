@@ -9,6 +9,7 @@ from src.constants import (
     BOT_INSTRUCTIONS,
     BOT_NAME,
     EXAMPLE_CONVOS,
+    GROQ_API_KEY,
 )
 import discord
 from src.base import Message, Prompt, Conversation, ThreadConfig
@@ -36,9 +37,13 @@ class CompletionData:
     status: CompletionResult
     reply_text: Optional[str]
     status_text: Optional[str]
+    tokens_used: Optional[int] = None
 
 
-client = AsyncOpenAI()
+client = AsyncOpenAI(
+    api_key=GROQ_API_KEY,
+    base_url="https://api.groq.com/openai/v1",
+)
 
 
 async def generate_completion_response(
@@ -61,6 +66,11 @@ async def generate_completion_response(
             max_tokens=thread_config.max_tokens,
             stop=["<|endoftext|>"],
         )
+        
+        # Extract token usage
+        tokens_used = response.usage.total_tokens if response.usage else 0
+        logger.info(f"Tokens used: {tokens_used} (prompt: {response.usage.prompt_tokens if response.usage else 0}, completion: {response.usage.completion_tokens if response.usage else 0})")
+        
         reply = response.choices[0].message.content.strip()
         if reply:
             flagged_str, blocked_str = moderate_message(
@@ -71,6 +81,7 @@ async def generate_completion_response(
                     status=CompletionResult.MODERATION_BLOCKED,
                     reply_text=reply,
                     status_text=f"from_response:{blocked_str}",
+                    tokens_used=tokens_used,
                 )
 
             if len(flagged_str) > 0:
@@ -78,10 +89,11 @@ async def generate_completion_response(
                     status=CompletionResult.MODERATION_FLAGGED,
                     reply_text=reply,
                     status_text=f"from_response:{flagged_str}",
+                    tokens_used=tokens_used,
                 )
 
         return CompletionData(
-            status=CompletionResult.OK, reply_text=reply, status_text=None
+            status=CompletionResult.OK, reply_text=reply, status_text=None, tokens_used=tokens_used
         )
     except openai.BadRequestError as e:
         if "This model's maximum context length" in str(e):
