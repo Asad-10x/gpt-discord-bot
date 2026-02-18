@@ -206,16 +206,31 @@ async def on_message(message: DiscordMessage):
         # Handle regular channel messages with trigger words
         if isinstance(channel, discord.TextChannel):
             should_respond = False
+            context_message = None
             
             # Check for trigger words
             message_lower = message.content.lower()
-            if any(trigger in message_lower for trigger in TRIGGER_WORDS):
+            has_trigger = any(trigger in message_lower for trigger in TRIGGER_WORDS)
+            
+            if has_trigger:
                 should_respond = True
                 logger.info(
                     f"Direct message from {message.author}: {message.content[:50]}"
                 )
+                
+                # Check if replying to someone (context mode)
+                if message.reference is not None:
+                    try:
+                        replied_to = await channel.fetch_message(message.reference.message_id)
+                        # Include context from the message being replied to
+                        context_message = replied_to
+                        logger.info(
+                            f"Context reply from {message.author} to {replied_to.author}: {message.content[:50]}"
+                        )
+                    except Exception as e:
+                        logger.debug(f"Could not fetch referenced message: {e}")
             
-            # Check if replying to a bot message
+            # Check if replying to a bot message (no trigger needed)
             elif message.reference is not None:
                 try:
                     replied_to = await channel.fetch_message(message.reference.message_id)
@@ -241,10 +256,22 @@ async def on_message(message: DiscordMessage):
                     )
                     return
                 
+                # Build message context
+                messages_to_send = []
+                
+                # Add context from replied-to message if available
+                if context_message:
+                    messages_to_send.append(
+                        Message(user=context_message.author.name, text=context_message.content)
+                    )
+                
+                # Add current message
+                messages_to_send.append(Message(user=message.author.name, text=message.content))
+                
                 # generate response
                 async with channel.typing():
                     response_data = await generate_completion_response(
-                        messages=[Message(user=message.author.name, text=message.content)],
+                        messages=messages_to_send,
                         user=message.author,
                         thread_config=ThreadConfig(
                             model=DEFAULT_MODEL,
